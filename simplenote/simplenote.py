@@ -126,7 +126,10 @@ class Simplenote(object):
             - status (int): 0 on sucesss and -1 otherwise
 
         """
-        note = self.__decode(note)
+        params = {
+                'auth' : self.get_token(),
+                'email' : self.username
+                }
 
         # determine whether to create a new note or update an existing one
         if "key" in note:
@@ -134,18 +137,17 @@ class Simplenote(object):
             if 'modifydate' not in note:
                 note["modifydate"] = time.time()
 
-            url = '{0}/{1}?auth={2}&email={3}'.format(DATA_URL, note["key"],
-                                                      self.get_token(), self.username)
+            url = '{0}/{1}'.format(DATA_URL, note["key"])
         else:
-            url = '{0}?auth={1}&email={2}'.format(DATA_URL, self.get_token(), self.username)
-        request = Request(url, urllib.quote(json.dumps(note)).encode('utf-8'))
-        response = ""
+            url = DATA_URL
+
         try:
-            response = urllib2.urlopen(request)
+            response = self.session.post(url, params=params, json=note)
         except IOError as e:
             return e, -1
-        note = json.loads(response.read().decode('utf-8'))
-        note = self.__encode(note)
+
+        note = response.json()
+
         return note, 0
 
     def add_note(self, note):
