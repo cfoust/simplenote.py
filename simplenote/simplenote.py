@@ -81,6 +81,12 @@ class Simplenote(object):
         except TypeError:
             return self.token
 
+    def get_auth_params(self):
+        return {
+                'auth' : self.get_token(),
+                'email' : self.username
+                }
+
     def get_note(self, noteid, version=None):
         """ method to get a specific note
 
@@ -100,16 +106,17 @@ class Simplenote(object):
         if version is not None:
             params_version = '/' + str(version)
          
-        params = '/{0}{1}?auth={2}&email={3}'.format(noteid, params_version, self.get_token(), self.username)
-        request = Request(DATA_URL+params)
+        url = "%s/%s%s" % (DATA_URL, noteid, params_version)
+
         try:
-            response = urllib2.urlopen(request)
+            response = self.session.get(url, params=self.get_auth_params())
         except HTTPError as e:
             return e, -1
         except IOError as e:
             return e, -1
-        note = json.loads(response.read().decode('utf-8'))
-        note = self.__encode(note)
+
+        note = response.json()
+
         return note, 0
 
     def update_note(self, note):
@@ -126,10 +133,6 @@ class Simplenote(object):
             - status (int): 0 on sucesss and -1 otherwise
 
         """
-        params = {
-                'auth' : self.get_token(),
-                'email' : self.username
-                }
 
         # determine whether to create a new note or update an existing one
         if "key" in note:
@@ -142,7 +145,7 @@ class Simplenote(object):
             url = DATA_URL
 
         try:
-            response = self.session.post(url, params=params, json=note)
+            response = self.session.post(url, params=self.get_auth_params(), json=note)
         except IOError as e:
             return e, -1
 
@@ -204,11 +207,8 @@ class Simplenote(object):
         notes = { "data" : [] }
         self.mark = "mark"
 
-        params = {
-                'auth' : self.get_token(),
-                'email' : self.username,
-                'length' : NOTE_FETCH_LENGTH
-                }
+        params = self.get_auth_params()
+        params['length'] = NOTE_FETCH_LENGTH
 
         try:
             sinceUT = time.mktime(datetime.datetime.strptime(since, "%Y-%m-%d").timetuple())
@@ -246,10 +246,13 @@ class Simplenote(object):
         """
         # get note
         note, status = self.get_note(note_id)
+
         if (status == -1):
             return note, status
+
         # set deleted property
         note["deleted"] = 1
+
         # update note
         return self.update_note(note)
 
@@ -268,54 +271,18 @@ class Simplenote(object):
         """
         # notes have to be trashed before deletion
         note, status = self.trash_note(note_id)
+
         if (status == -1):
             return note, status
 
-        params = '/{0}?auth={1}&email={2}'.format(str(note_id), self.get_token(),
-                                                  self.username)
-        request = Request(url=DATA_URL+params, method='DELETE')
+        url = "%s/%s" % (DATA_URL, str(note_id))
+
         try:
-            urllib2.urlopen(request)
+            self.session.delete(DATA_URL, params=self.get_auth_params())
         except IOError as e:
             return e, -1
+
         return {}, 0
-
-    def __encode(self, note):
-        """ Private method to UTF-8 encode for Python 2
-
-        Arguments:
-            A note
-
-        Returns:
-            A note
-
-        """
-
-        if sys.version_info < (3, 0):
-            if "content" in note:
-                # use UTF-8 encoding
-                note["content"] = note["content"].encode('utf-8')
-                # For early versions of notes, tags not always available
-            if "tags" in note:
-                note["tags"] = [t.encode('utf-8') for t in note["tags"]]
-        return note
-
-    def __decode(self, note):
-        """ Utility method to UTF-8 decode for Python 2
-
-        Arguments:
-            A note
-
-        Returns:
-            A note
-
-        """
-        if sys.version_info < (3, 0):
-            if "content" in note:
-                note["content"] = unicode(note["content"], 'utf-8')
-            if "tags" in note:
-                note["tags"] = [unicode(t, 'utf-8') for t in note["tags"]]
-        return note
 
     def __get_notes(self, notes, params):
         """ Private method to fetch a chunk of notes

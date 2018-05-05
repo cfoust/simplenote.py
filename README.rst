@@ -25,6 +25,9 @@ Introduction
 =============
 simplenote.py is a python library for the simplenote.com_ web service.
 
+*Note*: I (cfoust) forked this library to have it use `requests` instead
+of `urllib`.
+
 Installation
 =============
 Install via pip::
