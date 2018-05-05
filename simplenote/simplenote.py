@@ -127,6 +127,7 @@ class Simplenote(object):
 
         """
         note = self.__decode(note)
+
         # determine whether to create a new note or update an existing one
         if "key" in note:
             # set modification timestamp if not set by client
@@ -201,12 +202,15 @@ class Simplenote(object):
         notes = { "data" : [] }
         self.mark = "mark"
 
-        params = 'auth={0}&email={1}&length={2}'.format(self.get_token(), self.username,
-                                                        NOTE_FETCH_LENGTH)
+        params = {
+                'auth' : self.get_token(),
+                'email' : self.username,
+                'length' : NOTE_FETCH_LENGTH
+                }
 
         try:
             sinceUT = time.mktime(datetime.datetime.strptime(since, "%Y-%m-%d").timetuple())
-            params += '&since={0}'.format(sinceUT)
+            params['since'] = sinceUT
         except (TypeError, ValueError):
             #I.e. None or invalid date format
             pass
@@ -328,18 +332,19 @@ class Simplenote(object):
         notes_index = {}
 
         if self.mark != "mark":
-            params += '&mark={0}'.format(self.mark)
-        # perform HTTP request
+            params['mark'] = self.mark
+
         try:
-            request = Request(INDX_URL+params)
-            response = urllib2.urlopen(request)
-            notes_index = json.loads(response.read().decode('utf-8'))
+            response = self.session.get(INDX_URL, params=params)
+            notes_index = response.json()
             notes["data"].extend(notes_index["data"])
             status = 0
         except IOError:
             status = -1
+
         if "mark" in notes_index:
             self.mark = notes_index["mark"]
         else:
             self.mark = ""
+
         return notes, status
