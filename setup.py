@@ -9,7 +9,7 @@ import simplenote
 
 from distutils.core import setup
 
-requires = []
+requires = ['requests']
 
 if sys.version_info[:2] < (2,6):
     requires.append('simplejson')

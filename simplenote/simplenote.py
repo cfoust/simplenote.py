@@ -6,32 +6,15 @@
     Python library for accessing the Simplenote API
 
     :copyright: (c) 2011 by Daniel Schauenberg
+    :copyright: (c) 2018 by Caleb Foust
     :license: MIT, see LICENSE for more details.
 """
-import sys
-if sys.version_info > (3, 0):
-    import urllib.request as urllib2
-    import urllib.error
-    from urllib.error import HTTPError
-    import urllib.parse as urllib
-else:
-    import urllib2
-    from urllib2 import HTTPError
-    import urllib
-
 
 import base64
-import time
 import datetime
-
-try:
-    import json
-except ImportError:
-    try:
-        import simplejson as json
-    except ImportError:
-        # For Google AppEngine
-        from django.utils import simplejson as json
+import json
+import requests
+import time
 
 AUTH_URL = 'https://app.simplenote.com/api/login'
 DATA_URL = 'https://app.simplenote.com/api2/data'
@@ -40,7 +23,6 @@ NOTE_FETCH_LENGTH = 100
 
 class SimplenoteLoginFailed(Exception):
     pass
-
 
 class Simplenote(object):
     """ Class for interacting with the simplenote web service """
@@ -51,6 +33,7 @@ class Simplenote(object):
         self.password = password
         self.token = None
         self.mark = "mark"
+        self.session = requests.Session()
 
     def authenticate(self, user, password):
         """ Method to get simplenote auth token
@@ -64,14 +47,16 @@ class Simplenote(object):
 
         """
         auth_params = "email={0}&password={1}".format(user, password)
+
         try:
             values = base64.b64encode(bytes(auth_params,'utf-8'))
         except TypeError:
             values = base64.encodestring(auth_params)
 
-        request = Request(AUTH_URL, values)
+        response = self.session.post(AUTH_URL, data=values)
+
         try:
-            res = urllib2.urlopen(request).read()
+            res = response.text
             token = res
         except HTTPError:
             raise SimplenoteLoginFailed('Login to Simplenote API failed!')
@@ -95,8 +80,6 @@ class Simplenote(object):
             return str(self.token,'utf-8')
         except TypeError:
             return self.token
-
-
 
     def get_note(self, noteid, version=None):
         """ method to get a specific note
@@ -360,23 +343,3 @@ class Simplenote(object):
         else:
             self.mark = ""
         return notes, status
-
-
-class Request(urllib2.Request):
-    """ monkey patched version of urllib2's Request to support HTTP DELETE
-        Taken from http://python-requests.org, thanks @kennethreitz
-    """
-
-    if sys.version_info < (3, 0):
-        def __init__(self, url, data=None, headers={}, origin_req_host=None,
-                    unverifiable=False, method=None):
-            urllib2.Request.__init__(self, url, data, headers, origin_req_host, unverifiable)
-            self.method = method
-
-        def get_method(self):
-            if self.method:
-                return self.method
-
-            return urllib2.Request.get_method(self)
-    else:
-        pass
